@@ -44,12 +44,15 @@ model Session {
 model Shop {
   id               String            @id @default(cuid())
   shopifyDomain    String            @unique
+  shopifyShopId    String?
   name             String?
   email            String?
   currency         String            @default("USD")
+  country          String?
   ianaTimezone     String            @default("UTC")
   installedAt      DateTime          @default(now())
   uninstalledAt    DateTime?
+  lastConnectedAt  DateTime          @default(now())
   isActive         Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -63,6 +66,7 @@ model Shop {
   auditLogs        AuditLog[]
 
   @@index([shopifyDomain])
+  @@index([shopifyShopId])
   @@index([isActive])
 }
 
