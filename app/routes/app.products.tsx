@@ -8,10 +8,12 @@ import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { MetricCard } from "../components/MetricCard";
 import { EmptyStatePlaceholder } from "../components/EmptyStatePlaceholder";
+import { syncShopFromAdmin } from "../services/shop.server";
 import { db } from "../db/index.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
+  const { totalProducts } = await syncShopFromAdmin(admin, session.shop);
   const shop = await db.shop.findUnique({
     where: { shopifyDomain: session.shop },
     include: {
@@ -23,8 +25,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
 
+  const count = totalProducts ?? shop?._count.products ?? 0;
+
   return {
-    totalProducts: shop?._count.products || 0,
+    totalProducts: count,
     syncedProducts: 0,
     pendingProducts: 0,
     excludedProducts: 0,

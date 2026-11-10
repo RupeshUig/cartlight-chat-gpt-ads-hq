@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { redirect, Form, useLoaderData } from "react-router";
 
 import { login } from "../../shopify.server";
+import { APP_NAME, COMPANY_NAME } from "../../config/constants";
 
 import styles from "./styles.module.css";
 
@@ -21,16 +22,22 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>{APP_NAME}</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          by {COMPANY_NAME} — Intelligent advertising intelligence, ChatGPT feed management, and margin guardrails for Shopify merchants.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
             <label className={styles.label}>
               <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
+              <input
+                className={styles.input}
+                type="text"
+                name="shop"
+                placeholder="my-shop-domain.myshopify.com"
+                required
+              />
+              <span>Enter your store myshopify.com domain to log in</span>
             </label>
             <button className={styles.button} type="submit">
               Log in
@@ -39,16 +46,13 @@ export default function App() {
         )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>ChatGPT Ad Attribution</strong>. Connect conversational AI ad placements directly to Shopify checkouts and repeat customers.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Unit Economics & Net Profit</strong>. Calculate true contribution margin after ad spend, merchant fees, and COGS.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Automated Guardrails</strong>. Protect your ad budget with real-time margin alerts before ROAS drops below breakeven.
           </li>
         </ul>
       </div>

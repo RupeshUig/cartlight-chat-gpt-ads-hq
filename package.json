@@ -18,6 +18,7 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
+    "test": "npx tsx app/test/phase1_test.ts",
     "typecheck": "react-router typegen && tsc --noEmit"
   },
   "type": "module",

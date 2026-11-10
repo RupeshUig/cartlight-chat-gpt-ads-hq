@@ -23,7 +23,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shopDomain: session.shop,
     currency: shop?.currency || "USD",
     timezone: shop?.ianaTimezone || "UTC",
-    connectionStatus: shop?.openAIConnection?.status || "DISCONNECTED",
+    connectionStatus: shop?.openAIConnection?.status === "CONNECTED" ? "CONNECTED" : "Not connected",
     organizationId: shop?.openAIConnection?.organizationId || "",
     rulesCount: shop?.spendRules.length || 0,
   };

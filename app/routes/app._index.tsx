@@ -8,24 +8,27 @@ import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
-import { getShopOverview } from "../services/shop.server";
+import { EmptyStatePlaceholder } from "../components/EmptyStatePlaceholder";
+import { syncShopFromAdmin, getShopOverview } from "../services/shop.server";
 import { listActiveAlerts } from "../services/alerts.server";
-import { getRecentSyncRuns } from "../services/sync.server";
-import { formatCurrency, formatDateTime } from "../utils/formatting";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  const shop = await getShopOverview(session.shop);
+  const { session, admin } = await authenticate.admin(request);
+  const { shop, totalProducts } = await syncShopFromAdmin(admin, session.shop);
+  const overview = await getShopOverview(session.shop);
   const alerts = shop?.id ? await listActiveAlerts(shop.id) : [];
-  const syncRuns = shop?.id ? await getRecentSyncRuns(shop.id, 3) : [];
+
+  const productCount = totalProducts ?? overview?._count.products ?? 0;
 
   return {
     shopDomain: session.shop,
-    connectionStatus: shop?.openAIConnection?.status || "DISCONNECTED",
-    productCount: shop?._count.products || 0,
+    shopName: shop?.name || session.shop.replace(".myshopify.com", ""),
+    currency: shop?.currency || "USD",
+    shopifyStatus: shop?.isActive ? "Active" : "Inactive",
+    openAIStatus: "Not connected" as const,
+    productCount,
     alertsCount: alerts.length,
-    activeRulesCount: shop?._count.spendRules || 0,
-    syncRuns,
+    activeRulesCount: overview?._count.spendRules || 0,
   };
 };
 
@@ -38,20 +41,15 @@ export default function OverviewPage() {
         Connect ChatGPT Ads
       </s-button>
 
-      {/* Connection Notice */}
-      {data.connectionStatus === "DISCONNECTED" && (
-        <s-banner
-          tone="info"
-          heading="Welcome to Cartlight: ChatGPT Ads HQ"
-        >
-          <s-paragraph>
-            Your Shopify store is initialized and ready. Connect your OpenAI Ads account in{" "}
-            <s-link href="/app/settings">Settings</s-link> to enable ChatGPT product feed synchronization, campaign attribution, and AI-driven ad tracking.
-          </s-paragraph>
-        </s-banner>
-      )}
+      {/* Welcome Banner */}
+      <s-banner tone="info" heading={`Welcome to Cartlight, ${data.shopName}`}>
+        <s-paragraph>
+          Your Shopify store is authenticated and linked. Connect your OpenAI Ads account in{" "}
+          <s-link href="/app/settings">Settings</s-link> to activate ChatGPT campaign tracking, automated product feed matching, and real-time margin guardrails.
+        </s-paragraph>
+      </s-banner>
 
-      {/* KPI Highlights Grid */}
+      {/* Store & Integration Summary Cards */}
       <div
         style={{
           display: "grid",
@@ -62,111 +60,100 @@ export default function OverviewPage() {
         }}
       >
         <MetricCard
-          title="Blended Ad Spend"
-          value={formatCurrency(0)}
-          subtitle="Last 30 days"
+          title="Store Connection"
+          value={data.shopifyStatus}
+          subtitle={`Shopify: ${data.shopDomain}`}
         />
         <MetricCard
-          title="Conversion Value"
-          value={formatCurrency(0)}
-          subtitle="ChatGPT attributed"
+          title="Store Currency"
+          value={data.currency}
+          subtitle="Catalog billing currency"
         />
         <MetricCard
-          title="Blended ROAS"
-          value="0.00x"
-          subtitle="Target: 3.50x"
-        />
-        <MetricCard
-          title="Synced Products"
+          title="Catalog Products"
           value={String(data.productCount)}
-          subtitle="Ready for AI matching"
+          subtitle="Detected in Shopify store"
+        />
+        <MetricCard
+          title="ChatGPT Ads Integration"
+          value={data.openAIStatus}
+          subtitle="Phase 2 integration ready"
         />
       </div>
 
-      {/* Operational Modules */}
-      <s-section heading="System Status & Feed Health">
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "12px 16px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e1e3e5",
-              borderRadius: "6px",
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 600, fontSize: "14px", color: "#202223" }}>
-                ChatGPT Ads Connection
-              </div>
-              <div style={{ fontSize: "12px", color: "#6d7175" }}>
-                API integration for ad placements and organic merchant matching
-              </div>
-            </div>
-            <StatusBadge status={data.connectionStatus} />
+      {/* Store Information Details Card */}
+      <s-section heading="Authenticated Store Details">
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #e1e3e5",
+            borderRadius: "8px",
+            padding: "16px 20px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "16px",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Store Name</div>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "#202223" }}>{data.shopName}</div>
           </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "12px 16px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e1e3e5",
-              borderRadius: "6px",
-            }}
-          >
+          <div>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Shopify Domain</div>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "#202223" }}>{data.shopDomain}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Operating Currency</div>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "#202223" }}>{data.currency}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Shopify Connection</div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "14px", color: "#202223" }}>
-                Active Guardrails & Rules
-              </div>
-              <div style={{ fontSize: "12px", color: "#6d7175" }}>
-                Automated budget protection and margin threshold stops
-              </div>
+              <StatusBadge status={data.shopifyStatus} />
             </div>
-            <div style={{ fontSize: "13px", fontWeight: 600 }}>
-              {data.activeRulesCount} active
+          </div>
+          <div>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>OpenAI Ads Status</div>
+            <div>
+              <StatusBadge status={data.openAIStatus} />
             </div>
           </div>
         </div>
       </s-section>
 
-      {/* Quick Links / Aside */}
-      <s-section slot="aside" heading="Quick Navigation">
-        <s-unordered-list>
-          <s-list-item>
-            <s-link href="/app/profitability">Analyze Profitability</s-link>
-          </s-list-item>
-          <s-list-item>
-            <s-link href="/app/products">Manage Product Feed</s-link>
-          </s-list-item>
-          <s-list-item>
-            <s-link href="/app/tracking">Verify Conversion Tracking</s-link>
-          </s-list-item>
-          <s-list-item>
-            <s-link href="/app/campaigns">View ChatGPT Campaigns</s-link>
-          </s-list-item>
-          <s-list-item>
-            <s-link href="/app/alerts">Active Alerts ({data.alertsCount})</s-link>
-          </s-list-item>
-        </s-unordered-list>
+      {/* Pipeline Status Empty State */}
+      <s-section heading="Advertising Intelligence & Attribution">
+        <EmptyStatePlaceholder
+          icon="⚡"
+          title="ChatGPT Advertising Pipeline Not Connected"
+          description="Product synchronization, conversion attribution, and margin guardrails will activate automatically in subsequent phases once OpenAI Ads API integration is configured."
+          actionLabel="View Integration Settings"
+          actionHref="/app/settings"
+        />
       </s-section>
 
-      <s-section slot="aside" heading="Recent Sync Activity">
-        {data.syncRuns.length === 0 ? (
-          <s-paragraph>No sync runs executed yet.</s-paragraph>
-        ) : (
-          <s-unordered-list>
-            {data.syncRuns.map((run) => (
-              <s-list-item key={run.id}>
-                {run.syncType} ({run.status}) — {formatDateTime(run.startedAt)}
-              </s-list-item>
-            ))}
-          </s-unordered-list>
-        )}
+      {/* Quick Links / Aside */}
+      <s-section slot="aside" heading="Application Modules">
+        <s-unordered-list>
+          <s-list-item>
+            <s-link href="/app/profitability">Profitability</s-link> — Net margins & ROAS tracking
+          </s-list-item>
+          <s-list-item>
+            <s-link href="/app/products">Products</s-link> — Catalog sync & COGS
+          </s-list-item>
+          <s-list-item>
+            <s-link href="/app/tracking">Tracking</s-link> — Conversion attribution & pixel
+          </s-list-item>
+          <s-list-item>
+            <s-link href="/app/campaigns">Campaigns</s-link> — Ad sets & creative performance
+          </s-list-item>
+          <s-list-item>
+            <s-link href="/app/alerts">Alerts</s-link> — Margin notifications ({data.alertsCount})
+          </s-list-item>
+          <s-list-item>
+            <s-link href="/app/settings">Settings</s-link> — API keys & spend rules ({data.activeRulesCount})
+          </s-list-item>
+        </s-unordered-list>
       </s-section>
     </s-page>
   );

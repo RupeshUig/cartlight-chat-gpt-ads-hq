@@ -61,3 +61,4 @@ export function maskApiKey(apiKey: string): string {
   const suffix = apiKey.slice(-4);
   return `${prefix}...${suffix}`;
 }
+
