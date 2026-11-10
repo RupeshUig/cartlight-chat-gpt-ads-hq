@@ -1,5 +1,6 @@
 {
-  "name": "app",
+  "name": "cartlight-chatgpt-ads-hq",
+  "description": "Cartlight: ChatGPT Ads HQ — Production-quality Shopify embedded application",
   "private": true,
   "scripts": {
     "build": "react-router build",

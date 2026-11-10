@@ -1,16 +1,9 @@
-import { PrismaClient } from "@prisma/client";
+/**
+ * Cartlight: ChatGPT Ads HQ
+ * Database Server Export (Shopify App Template Compatibility)
+ */
 
-declare global {
-  // eslint-disable-next-line no-var
-  var prismaGlobal: PrismaClient;
-}
+import { db, checkDatabaseConnection } from "./db/index.server";
 
-if (process.env.NODE_ENV !== "production") {
-  if (!global.prismaGlobal) {
-    global.prismaGlobal = new PrismaClient();
-  }
-}
-
-const prisma = global.prismaGlobal ?? new PrismaClient();
-
-export default prisma;
+export default db;
+export { db, checkDatabaseConnection };

@@ -1,34 +1,254 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Cartlight Labs — Prisma Schema
+// Provider configured for SQLite in local development
+// Ready for seamless migration to PostgreSQL in production
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
-  url      = "file:dev.sqlite"
+  url      = env("DATABASE_URL")
 }
 
+// -------------------------------------------------------------
+// Shopify Authentication Session Storage
+// Required by @shopify/shopify-app-session-storage-prisma
+// -------------------------------------------------------------
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+
+  @@index([shop])
+}
+
+// -------------------------------------------------------------
+// Core Domain: Shop
+// Represents an installed Shopify merchant store
+// -------------------------------------------------------------
+model Shop {
+  id               String            @id @default(cuid())
+  shopifyDomain    String            @unique
+  name             String?
+  email            String?
+  currency         String            @default("USD")
+  ianaTimezone     String            @default("UTC")
+  installedAt      DateTime          @default(now())
+  uninstalledAt    DateTime?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  products         Product[]
+  openAIConnection OpenAIConnection?
+  syncRuns         SyncRun[]
+  dailyInsights    DailyInsight[]
+  alerts           Alert[]
+  spendRules       SpendRule[]
+  auditLogs        AuditLog[]
+
+  @@index([shopifyDomain])
+  @@index([isActive])
+}
+
+// -------------------------------------------------------------
+// Product Catalog & Sync State
+// -------------------------------------------------------------
+model Product {
+  id                String           @id @default(cuid())
+  shopId            String
+  shopifyProductId  String
+  title             String
+  handle            String?
+  status            String           @default("ACTIVE") // ACTIVE, ARCHIVED, DRAFT
+  vendor            String?
+  productType       String?
+  totalInventory    Int              @default(0)
+  isSyncedToChatGPT Boolean          @default(false)
+  chatGPTSyncStatus String           @default("PENDING") // PENDING, SYNCED, FAILED, EXCLUDED
+  lastSyncedAt      DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  shop              Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  variants          ProductVariant[]
+
+  @@unique([shopId, shopifyProductId])
+  @@index([shopId])
+  @@index([status])
+  @@index([chatGPTSyncStatus])
+}
+
+model ProductVariant {
+  id                String   @id @default(cuid())
+  productId         String
+  shopifyVariantId  String
+  title             String
+  sku               String?
+  price             Float    @default(0.0)
+  compareAtPrice    Float?
+  inventoryQuantity Int      @default(0)
+  barcode           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, shopifyVariantId])
+  @@index([productId])
+  @@index([sku])
+}
+
+// -------------------------------------------------------------
+// OpenAI Ads Connection
+// -------------------------------------------------------------
+model OpenAIConnection {
+  id              String    @id @default(cuid())
+  shopId          String    @unique
+  organizationId  String?
+  accountId       String?
+  status          String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR, PENDING
+  lastConnectedAt DateTime?
+  lastSyncAt      DateTime?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([status])
+}
+
+// -------------------------------------------------------------
+// Sync & Telemetry Pipeline
+// -------------------------------------------------------------
+model SyncRun {
+  id             String    @id @default(cuid())
+  shopId         String
+  syncType       String    // PRODUCTS, METRICS, CAMPAIGNS, FULL
+  status         String    @default("PENDING") // PENDING, RUNNING, SUCCESS, FAILED, PARTIAL
+  itemsTotal     Int       @default(0)
+  itemsProcessed Int       @default(0)
+  itemsFailed    Int       @default(0)
+  errorMessage   String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  shop           Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// -------------------------------------------------------------
+// Performance & Profitability Insights
+// -------------------------------------------------------------
+model DailyInsight {
+  id              String   @id @default(cuid())
+  shopId          String
+  date            DateTime
+  adSpend         Float    @default(0.0)
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  conversions     Int      @default(0)
+  conversionValue Float    @default(0.0)
+  roas            Float    @default(0.0)
+  cpa             Float    @default(0.0)
+  grossProfit     Float    @default(0.0)
+  netProfit       Float    @default(0.0)
+  currency        String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, date])
+  @@index([shopId])
+  @@index([date])
+}
+
+// -------------------------------------------------------------
+// Operational Alerts & Notifications
+// -------------------------------------------------------------
+model Alert {
+  id          String    @id @default(cuid())
+  shopId      String
+  title       String
+  message     String
+  severity    String    @default("INFO") // INFO, WARNING, CRITICAL
+  type        String    // BUDGET_EXCEEDED, SYNC_FAILURE, DISCONNECTED_ACCOUNT, ANOMALY, GENERAL
+  isRead      Boolean   @default(false)
+  isDismissed Boolean   @default(false)
+  dismissedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([severity])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// -------------------------------------------------------------
+// Automated Spend & Budget Guardrails
+// -------------------------------------------------------------
+model SpendRule {
+  id              String    @id @default(cuid())
+  shopId          String
+  name            String
+  description     String?
+  isActive        Boolean   @default(true)
+  ruleType        String    // MAX_DAILY_SPEND, TARGET_ROAS, MIN_MARGIN_STOP, ANOMALY_PAUSE
+  conditions      String    // Serialized JSON for portable cross-database storage
+  actions         String    // Serialized JSON for portable cross-database storage
+  lastTriggeredAt DateTime?
+  triggerCount    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([isActive])
+}
+
+// -------------------------------------------------------------
+// Security & Compliance Audit Log
+// -------------------------------------------------------------
+model AuditLog {
+  id         String   @id @default(cuid())
+  shopId     String
+  actor      String   // SYSTEM, USER, SHOPIFY_WEBHOOK, OPENAI_SYNC
+  action     String   // e.g., "CONNECTION_UPDATED", "RULE_TRIGGERED"
+  entityType String?
+  entityId   String?
+  details    String?  // Contextual JSON or summary
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId])
+  @@index([action])
+  @@index([createdAt])
 }
