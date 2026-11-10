@@ -12,6 +12,7 @@ export interface AppEnvConfig {
   SCOPES: string[];
   DATABASE_URL: string;
   PORT: number;
+  ENCRYPTION_KEY?: string;
   OPENAI_API_KEY?: string;
   OPENAI_ORGANIZATION_ID?: string;
   OPENAI_ADS_ACCOUNT_ID?: string;
@@ -54,6 +55,7 @@ export function validateEnv(): AppEnvConfig {
     SCOPES: scopes,
     DATABASE_URL: databaseUrl,
     PORT: isNaN(port) ? 3000 : port,
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_ORGANIZATION_ID: process.env.OPENAI_ORGANIZATION_ID,
     OPENAI_ADS_ACCOUNT_ID: process.env.OPENAI_ADS_ACCOUNT_ID,

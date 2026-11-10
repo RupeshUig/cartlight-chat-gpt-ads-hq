@@ -67,7 +67,7 @@ model Shop {
 }
 
 // -------------------------------------------------------------
-// Product Catalog & Sync State
+// Product Catalog, Cost of Goods (COGS), & Sync State
 // -------------------------------------------------------------
 model Product {
   id                String           @id @default(cuid())
@@ -95,33 +95,38 @@ model Product {
 }
 
 model ProductVariant {
-  id                String   @id @default(cuid())
-  productId         String
-  shopifyVariantId  String
-  title             String
-  sku               String?
-  price             Float    @default(0.0)
-  compareAtPrice    Float?
-  inventoryQuantity Int      @default(0)
-  barcode           String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  productId              String
+  shopifyVariantId       String
+  shopifyInventoryItemId String?
+  title                  String
+  sku                    String?
+  price                  Float    @default(0.0)
+  compareAtPrice         Float?
+  cost                   Float?   // Unit cost (COGS) from Shopify InventoryItem
+  inventoryQuantity      Int      @default(0)
+  barcode                String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product                Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([productId, shopifyVariantId])
   @@index([productId])
   @@index([sku])
+  @@index([shopifyInventoryItemId])
 }
 
 // -------------------------------------------------------------
-// OpenAI Ads Connection
+// OpenAI Ads Connection & Credentials at Rest
 // -------------------------------------------------------------
 model OpenAIConnection {
   id              String    @id @default(cuid())
   shopId          String    @unique
   organizationId  String?
   accountId       String?
+  encryptedApiKey String?   // AES-256-GCM encrypted API key at rest
+  keyPreview      String?   // Masked preview string for UI (e.g. sk-proj-...4f8b)
   status          String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR, PENDING
   lastConnectedAt DateTime?
   lastSyncAt      DateTime?
@@ -160,11 +165,22 @@ model SyncRun {
 
 // -------------------------------------------------------------
 // Performance & Profitability Insights
+// Supports multi-level reporting: SHOP, CAMPAIGN, AD_GROUP, AD, PRODUCT
 // -------------------------------------------------------------
 model DailyInsight {
   id              String   @id @default(cuid())
   shopId          String
   date            DateTime
+  granularity     String   @default("SHOP") // SHOP, CAMPAIGN, AD_GROUP, AD, PRODUCT
+  entityId        String   @default("SHOP") // "SHOP", campaignId, adGroupId, adId, or productId
+  campaignId      String?
+  campaignName    String?
+  adGroupId       String?
+  adGroupName     String?
+  adId            String?
+  adName          String?
+  productId       String?
+  variantId       String?
   adSpend         Float    @default(0.0)
   impressions     Int      @default(0)
   clicks          Int      @default(0)
@@ -180,8 +196,10 @@ model DailyInsight {
 
   shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  @@unique([shopId, date])
-  @@index([shopId])
+  @@unique([shopId, date, granularity, entityId])
+  @@index([shopId, granularity])
+  @@index([campaignId])
+  @@index([productId])
   @@index([date])
 }
 
